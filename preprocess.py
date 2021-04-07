@@ -6,71 +6,79 @@ import time
 import re
 from openings import get_openings
 from openings import store_openings
+import os
+import sys
 
+# turns pgn format into a more useful format for our calculations (.csv)
+# also allows for quick numpy analysis later on :)
+# if things go horribly wrong, delete the openings.dat file that was generated and re-run.
 
+def main(args:list):
+    preprocess(str(args[0]))
 
-# turns pgn format into a more useful format
-
-# main program entry
-def main():
-    openings_dict = get_openings()
-    print(openings_dict)
-    pgns = open("databases/lichess_db_standard_rated_2013-01.pgn", "r")
-    out = open("databases/OUT_lichess_db_standard_rated_2013-01.pgn", "w")
-    #openings = {}
+# preprocess all pgn files in path
+def preprocess(path:str):
     start = time.time()
-    process(openings_dict, pgns, out)
+    openings_dict = get_openings(path)
+    pgns = get_files(path)
+    print("turning",len(pgns),"files into csvs:")
+    for pgn in pgns:
+        print("\t",pgn)
+    # process every pgn file
+    for pgn in pgns:
+        p = open(pgn, "r")
+        out_name = pgn.split(".")[0]
+        out = open(out_name+".csv", "w")
+        process(openings_dict, p, out)
+        print("completed",pgn)
     end = time.time() - start
-    print(end)
-    #print(openings_dict)
-    store_openings(openings_dict)
-    #print(openings)
+    print("Done. Took",end,"seconds.")
+    # store the openings dictionary in openings.dat. NEED THIS FOR LATER!
+    store_openings(path, openings_dict)
 
+# returns a list of database names from root/directory
+def get_files(path:str):
+    databases = []
+    for root, directories, files in os.walk(path, topdown=False):
+	    for name in files:
+		    if ".pgn" in name: databases.append(os.path.join(root, name))
+	    for name in directories:
+		    if ".pgn" in name: databases.append(os.path.join(root, name))
+    return databases
+
+# do the processing line-by-line.
 def process(openings_dict, pgns, out):
     result = avg_elo = white_elo = 0 # 1 if white win, 0 if draw, 2 if black win
     opening = ''
-    i = 0
     for line in pgns:
-        # testing
-        #if i > 127:   
-        #    return
-
         if line.startswith("[R"): #Result 
-            i+=1
             quote_val = match_quotes(line)
             result = get_result(quote_val)
-
         elif line.startswith("[WhiteE"): #WhiteElo
             quote_val = match_quotes(line)
             white_elo = elo_to_int(quote_val)
-
         elif line.startswith("[BlackE"): #BlackElo
             quote_val = match_quotes(line)
             black_elo = elo_to_int(quote_val)
             # we can assume white's elo is already known because of the PGN format
             avg_elo = get_avg_elo(white_elo, black_elo)
-            #print(avg_elo)
-            
-        elif line.startswith("[Opening"):
+        elif line.startswith("[Opening"): #Opening
             quote_val = match_quotes(line)
-            #opening_str = quote_val.split(":")[0]
             opening_str = clean_opening_str(quote_val)
-            #print(quote_val,"-->>>", opening_str)
-            #opening = opening_to_int(quote_val)
             opening = opening_to_int(openings_dict, opening_str)
-            
-            #print(opening_str)
-            #print(i,"result:",result,"elo",avg_elo,"opening:",opening, opening_str)
-            #print(opening, opening_str)s
             out.write(str(result)+","+str(avg_elo)+","+str(opening)+"\n")
 
+# clean the opening string of horrible nonsense like #s, :s, and commas
+# returns a string.
 def clean_opening_str(opening_str):
     opening_str = opening_str.split(":")[0]
-    opening_str = opening_str.split("#")[0].strip()
-    #print(opening_str)
+    opening_str = opening_str.split("#")[0]
+    opening_str = opening_str.split(",")[0].strip()
     return opening_str
 
-def get_avg_elo(elo1, elo2):
+# gets the average elo between two values. Ignored bad elo values.
+# returns an int.
+def get_avg_elo(elo1:int, elo2:int):
     # check for and ignore bad elo values
     if (elo1 == 0):
         return elo2
@@ -78,38 +86,50 @@ def get_avg_elo(elo1, elo2):
         return elo1
     return np.divide(np.add(elo1, elo2), 2)
 
-def elo_to_int(elo):
+# cleans up the elo value. returns an int.
+# Who decided it was a good idea to include the "?" for unsure elos in the pgn?
+def elo_to_int(elo:str):
     elo = strip_questionmark(elo)
     if elo == '':
-        #print("found empty elo... ignoring...")
         return 0
     else:
         return int(elo)
 
-
+# strip the questionmark out of elos.
+# returns the new string
 def strip_questionmark(quote_val):
     return quote_val.replace("?","") 
 
+# turns an opening string into an int stored as a key in a dictionary.
+# who wants to deal with strings when you can deal with integers :)
+# returns an int corresponding to the key of the opening.
 def opening_to_int(openings_dict, opening_str):
+    # if the opening is already known, return the integer key.
     opening_int = openings_dict.get(opening_str)
+    # if the opening is not known, ADD IT!!!
     if not opening_int:
-        openings_dict[opening_str] = len(openings_dict)+1
-        opening_int = len(openings_dict)+1
+        openings_dict[opening_str] = int(len(openings_dict)+1)
+        opening_int = int(len(openings_dict)+1)
     return opening_int
 
-
-
-def get_result(quote_val):
+# turns results into integers.
+# returns an int
+def get_result(quote_val:str):
     if quote_val.startswith("1/"): #draw
         return 0
     elif quote_val.startswith("1"): #white win
         return 1
-    else:
+    else: #black win
         return 2
 
-def match_quotes(line):
+# helpful regex for line processing
+def match_quotes(line:str):
     return re.search("\"(.)*\"", line).group(0)[1:-1]
 
+# can call this from the commandline with preprocess.py <path-to-databases-directory>
+# but processing will probably call this too.
 if __name__ == "__main__":
-    main()
-
+    if len(sys.argv) != 2:
+        print("USEAGE: preprocess <path-to-databases-directory>")
+    else:
+        main(sys.argv[1:])
