@@ -6,110 +6,116 @@ import time
 import re
 from openings import get_openings
 from openings import store_openings
+import sys
+import os
 
+# does the bulk of the processing from our custom csv database to some more useful datafiles
 
-
-# turns pgn format into a more useful format
+#big_data = int
 
 # main program entry
-def main():
-    openings_dict = get_openings()
-    print(openings_dict)
-    pgns = open("databases/lichess_db_standard_rated_2013-01.pgn", "r")
-    out = open("databases/OUT_lichess_db_standard_rated_2013-01.pgn", "w")
-    #openings = {}
-    start = time.time()
-    process(openings_dict, pgns, out)
-    end = time.time() - start
-    print(end)
-    #print(openings_dict)
-    store_openings(openings_dict)
-    #print(openings)
+def main(args:list):
+    csvs = get_csvs(str(args[0]))
+    print(csvs)
+    #print(get_openings(str(args[0])))
+    iterate_csvs(csvs)
 
-def process(openings_dict, pgns, out):
-    result = avg_elo = white_elo = 0 # 1 if white win, 0 if draw, 2 if black win
-    opening = ''
-    i = 0
-    for line in pgns:
-        # testing
-        #if i > 127:   
-        #    return
+# opens all the files and returns a list of file objects instead of strings
+def open_all(out_names:list):
+    files = []
+    for name in out_names:
+        #f = open(name, "w")
+        #f.close()
+        f = open(name, "a")
+        files.append(f)
 
-        if line.startswith("[R"): #Result 
-            i+=1
-            quote_val = match_quotes(line)
-            result = get_result(quote_val)
+    return files
 
-        elif line.startswith("[WhiteE"): #WhiteElo
-            quote_val = match_quotes(line)
-            white_elo = elo_to_int(quote_val)
+def process(csv, data):
+    openings_dict = get_openings('D:databases')
+    #print(len(openings_dict)+1)
+    open_fq = init_array(len(openings_dict)+1)
+    print(open_fq.shape)
+    #print(data.shape)
 
-        elif line.startswith("[BlackE"): #BlackElo
-            quote_val = match_quotes(line)
-            black_elo = elo_to_int(quote_val)
-            # we can assume white's elo is already known because of the PGN format
-            avg_elo = get_avg_elo(white_elo, black_elo)
-            #print(avg_elo)
-            
-        elif line.startswith("[Opening"):
-            quote_val = match_quotes(line)
-            #opening_str = quote_val.split(":")[0]
-            opening_str = clean_opening_str(quote_val)
-            #print(quote_val,"-->>>", opening_str)
-            #opening = opening_to_int(quote_val)
-            opening = opening_to_int(openings_dict, opening_str)
-            
-            #print(opening_str)
-            #print(i,"result:",result,"elo",avg_elo,"opening:",opening, opening_str)
-            #print(opening, opening_str)s
-            out.write(str(result)+","+str(avg_elo)+","+str(opening)+"\n")
+    # data: the data in CSV:
+    # | result of the game| opening played | 
 
-def clean_opening_str(opening_str):
-    opening_str = opening_str.split(":")[0]
-    opening_str = opening_str.split("#")[0].strip()
-    #print(opening_str)
-    return opening_str
+    #result = data.bincount(axis=0)[0]
+    #u, indices = np.unique(data, return_inverse=True)
+    #most_popular_opening = u[np.argmax(np.apply_along_axis(np.bincount, 0,
+    #    indices.reshape(data.shape), None, np.max(indices) + 1), axis=0)][1]
 
-def get_avg_elo(elo1, elo2):
-    # check for and ignore bad elo values
-    if (elo1 == 0):
-        return elo2
-    if (elo2 == 0):
-        return elo1
-    return np.divide(np.add(elo1, elo2), 2)
+    #for k,v in openings_dict.items():
+    #    if most_popular_opening == int(k):
+    #        print("the most popular opening:", v)
 
-def elo_to_int(elo):
-    elo = strip_questionmark(elo)
-    if elo == '':
-        #print("found empty elo... ignoring...")
-        return 0
-    else:
-        return int(elo)
+    # for each opening, get the total number of games played
+    for game in data:
+        #print(game[0], game[1])
+        analyze_game(open_fq, game[0], game[1])
+    #print(open_fq)
+    save_open_fq(csv, open_fq)
+    # in open_fq, assume index refers to the openings.dat database value.
+    #print(open_fq)
 
+# result = 0 if draw, result = 1 if white win, result = 2 if black win
+def analyze_game(open_fq, result:int, opening:int):
+    #print(open_fq.shape)
+    # total number of games ++
+    #print(opening)
+    if opening > len(open_fq)-1:
+        return
+    open_fq[opening][0] = (open_fq[opening][0])+1
+    # white win
+    if result == 1:
+        open_fq[opening][1] = (open_fq[opening][1])+1
+    # black win
+    if result == 2:
+        open_fq[opening][2] = (open_fq[opening][2])+1
 
-def strip_questionmark(quote_val):
-    return quote_val.replace("?","") 
+def save_open_fq(csv, open_fq):
+    path = "D:databases/"
+    #print(open_fq.dtype)
+    #save = open("D:databases/FQ.csv", "w")
+    csv = strip_csv(csv)
+    df = pd.DataFrame(open_fq)
+    df.to_csv(csv+"DATA.csv", header=None)
+    #np.savetxt(save, open_fq.astype(int))
+    return
 
-def opening_to_int(openings_dict, opening_str):
-    opening_int = openings_dict.get(opening_str)
-    if not opening_int:
-        openings_dict[opening_str] = len(openings_dict)+1
-        opening_int = len(openings_dict)+1
-    return opening_int
+def strip_csv(csv:str):
+    return csv.split("GAMES")[0]
 
+# initializes the numpy array of length size
+def init_array(size:int):
+    #print(size)
+    open_fq = np.zeros((size,3), dtype=np.int)
+    return open_fq
 
+def get_csvs(path:str):
+    csvs = []
+    for root, directories, files in os.walk(path, topdown=False):
+	    for name in files:
+		    if ".csv" in name: csvs.append(os.path.join(root, name))
+	    for name in directories:
+		    if ".csv" in name: csvs.append(os.path.join(root, name))
+    return csvs
+    
+def iterate_csvs(csvs:list):
+    for csv in csvs:
+        #print(csv)
+        data = pd.read_csv(csv, header = None)
+        #print(data.head)
+        data = data.to_numpy(dtype=np.int)
+        print("analyzing",csv)
+        process(csv, data)
+        #print(data.shape)
+        #break
 
-def get_result(quote_val):
-    if quote_val.startswith("1/"): #draw
-        return 0
-    elif quote_val.startswith("1"): #white win
-        return 1
-    else:
-        return 2
-
-def match_quotes(line):
-    return re.search("\"(.)*\"", line).group(0)[1:-1]
 
 if __name__ == "__main__":
-    main()
-
+    if len(sys.argv) != 2:
+        print("USEAGE: python process.py <path-to-csvs-directory>")
+    else:
+        main(sys.argv[1:])

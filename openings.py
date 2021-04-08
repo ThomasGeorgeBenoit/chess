@@ -7,6 +7,8 @@ openings_dict = {}
 # loads in the opening file into a dictionary and returns it (a dictionary).
 def get_openings(path):
     openings = open(path+"/openings.dat", "r")
+    #if len(openings.readlines()) == 0:
+    #    return {}
     for opening in openings:
         opening_split = opening.strip().split(",")
         openings_dict[opening_split[1]] = opening_split[0]

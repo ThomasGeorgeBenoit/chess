@@ -13,6 +13,11 @@ import sys
 # also allows for quick numpy analysis later on :)
 # if things go horribly wrong, delete the openings.dat file that was generated and re-run.
 
+# RESULTING GAMES.CSVs DETAILS:
+# | result | opening |
+# result = 0 if draw, result = 1 if white win, result = 2 if black win
+
+
 def main(args:list):
     preprocess(str(args[0]))
 
@@ -25,16 +30,25 @@ def preprocess(path:str):
     for pgn in pgns:
         print("\t",pgn)
     # process every pgn file
+    #out = open(out_name+".csv", "w")
+    out_names = [path+"/0-999GAMES.csv",path+"/1000-1499GAMES.csv", path+"/1500-1999GAMES.csv", path+"/2000+GAMES.csv"]
+    out_names = open_all(out_names)
     for pgn in pgns:
         p = open(pgn, "r")
-        out_name = pgn.split(".")[0]
-        out = open(out_name+".csv", "w")
-        process(openings_dict, p, out)
-        print("completed",pgn)
+        #out_name = pgn.split(".")[0]
+        process(openings_dict, p, out_names)
+        print("completed",pgn,"took",time.time()-start,"seconds.")
     end = time.time() - start
     print("Done. Took",end,"seconds.")
     # store the openings dictionary in openings.dat. NEED THIS FOR LATER!
     store_openings(path, openings_dict)
+
+# opens all the files and returns a list of file objects instead of strings
+def open_all(out_names:list):
+    files = []
+    for name in out_names:
+        files.append(open(name, "a"))
+    return files
 
 # returns a list of database names from root/directory
 def get_files(path:str):
@@ -47,7 +61,7 @@ def get_files(path:str):
     return databases
 
 # do the processing line-by-line.
-def process(openings_dict, pgns, out):
+def process(openings_dict, pgns, out_names:list):
     result = avg_elo = white_elo = 0 # 1 if white win, 0 if draw, 2 if black win
     opening = ''
     for line in pgns:
@@ -66,7 +80,27 @@ def process(openings_dict, pgns, out):
             quote_val = match_quotes(line)
             opening_str = clean_opening_str(quote_val)
             opening = opening_to_int(openings_dict, opening_str)
-            out.write(str(result)+","+str(avg_elo)+","+str(opening)+"\n")
+            store_game(result, avg_elo, opening, out_names)
+
+# store games in different files depending on array brackets
+def store_game(result:int, avg_elo:int, opening:int, out_names:list):
+    if avg_elo < 1000:
+        #out_names[0].write(str(result)+","+str(avg_elo)+","+str(opening)+"\n")
+        out_names[0].write(str(result)+","+str(opening)+"\n")
+    elif avg_elo < 1500:
+        #out_names[1].write(str(result)+","+str(avg_elo)+","+str(opening)+"\n")
+        out_names[1].write(str(result)+","+str(opening)+"\n")
+    elif avg_elo < 2000:
+        #out_names[2].write(str(result)+","+str(avg_elo)+","+str(opening)+"\n")
+        out_names[2].write(str(result)+","+str(opening)+"\n")
+    else:
+        #out_names[3].write(str(result)+","+str(avg_elo)+","+str(opening)+"\n")
+        out_names[3].write(str(result)+","+str(opening)+"\n")
+
+# clean up files.
+def clean_up(open_files:list):
+    for file in open_files:
+        file.close()
 
 # clean the opening string of horrible nonsense like #s, :s, and commas
 # returns a string.
@@ -130,6 +164,6 @@ def match_quotes(line:str):
 # but processing will probably call this too.
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("USEAGE: preprocess <path-to-databases-directory>")
+        print("USEAGE: python preprocess.py <path-to-databases-directory>")
     else:
         main(sys.argv[1:])
