@@ -11,8 +11,6 @@ import os
 
 # does the bulk of the processing from our custom csv database to some more useful datafiles
 
-#big_data = int
-
 # main program entry
 def main(args:list):
     csvs = get_csvs(str(args[0]))
@@ -33,39 +31,22 @@ def open_all(out_names:list):
 
 def process(csv, data):
     openings_dict = get_openings('D:databases')
-    #print(len(openings_dict)+1)
     open_fq = init_array(len(openings_dict)+1)
-    print(open_fq.shape)
-    #print(data.shape)
-
     # data: the data in CSV:
     # | result of the game| opening played | 
 
-    #result = data.bincount(axis=0)[0]
-    #u, indices = np.unique(data, return_inverse=True)
-    #most_popular_opening = u[np.argmax(np.apply_along_axis(np.bincount, 0,
-    #    indices.reshape(data.shape), None, np.max(indices) + 1), axis=0)][1]
-
-    #for k,v in openings_dict.items():
-    #    if most_popular_opening == int(k):
-    #        print("the most popular opening:", v)
-
-    # for each opening, get the total number of games played
     for game in data:
-        #print(game[0], game[1])
+        # analyze it!!!
         analyze_game(open_fq, game[0], game[1])
-    #print(open_fq)
     save_open_fq(csv, open_fq)
-    # in open_fq, assume index refers to the openings.dat database value.
-    #print(open_fq)
+    # in open_fq, assume the index refers to the openings.dat database value.
 
 # result = 0 if draw, result = 1 if white win, result = 2 if black win
 def analyze_game(open_fq, result:int, opening:int):
-    #print(open_fq.shape)
-    # total number of games ++
-    #print(opening)
+    # funky error checking. This really shouldn't be triggered.
     if opening > len(open_fq)-1:
         return
+    # total number of games ++
     open_fq[opening][0] = (open_fq[opening][0])+1
     # white win
     if result == 1:
@@ -74,25 +55,24 @@ def analyze_game(open_fq, result:int, opening:int):
     if result == 2:
         open_fq[opening][2] = (open_fq[opening][2])+1
 
+# saves the frequency database into a file
 def save_open_fq(csv, open_fq):
     path = "D:databases/"
-    #print(open_fq.dtype)
-    #save = open("D:databases/FQ.csv", "w")
     csv = strip_csv(csv)
     df = pd.DataFrame(open_fq)
     df.to_csv(csv+"DATA.csv", header=None)
-    #np.savetxt(save, open_fq.astype(int))
     return
 
+# strips the csv of their GAMES tag.
 def strip_csv(csv:str):
     return csv.split("GAMES")[0]
 
 # initializes the numpy array of length size
 def init_array(size:int):
-    #print(size)
     open_fq = np.zeros((size,3), dtype=np.int)
     return open_fq
 
+# get all the relevant csvs from the databases directory
 def get_csvs(path:str):
     csvs = []
     for root, directories, files in os.walk(path, topdown=False):
@@ -102,17 +82,13 @@ def get_csvs(path:str):
 		    if ".csv" in name: csvs.append(os.path.join(root, name))
     return csvs
     
+# iterate through all the csvs. calls the processing function.
 def iterate_csvs(csvs:list):
     for csv in csvs:
-        #print(csv)
         data = pd.read_csv(csv, header = None)
-        #print(data.head)
         data = data.to_numpy(dtype=np.int)
         print("analyzing",csv)
         process(csv, data)
-        #print(data.shape)
-        #break
-
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

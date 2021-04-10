@@ -55,9 +55,9 @@ def get_files(path:str):
     databases = []
     for root, directories, files in os.walk(path, topdown=False):
 	    for name in files:
-		    if ".pgn" in name: databases.append(os.path.join(root, name))
+		    if ( ".pgn" in name) and ("bz2" not in name): databases.append(os.path.join(root, name))
 	    for name in directories:
-		    if ".pgn" in name: databases.append(os.path.join(root, name))
+		    if ( ".pgn" in name) and ("bz2" not in name): databases.append(os.path.join(root, name))
     return databases
 
 # do the processing line-by-line.
