@@ -85,12 +85,12 @@ def generate_chart(rating_range:str, best_openings, color:str):
     plot_chart(rating_range, best_openings, color)
 
 
-def plot_chart(rating_range, best_openings, color):
+def plot_chart(rating_range:str, best_openings, color:str):
     win_w = []
     draw_ = []
     win_b = []
-    for opening in best_openings:
-        print(opening.index, opening.num_games, opening.win_percent_w, opening.win_percent_b)
+    #for opening in best_openings:
+    #    print(opening.index, opening.num_games, opening.win_percent_w, opening.win_percent_b)
 
     openings_str_list = []
     for opening in best_openings:
@@ -114,16 +114,19 @@ def plot_chart(rating_range, best_openings, color):
 
     #add labels, title, tick marks, and legend
     plt.xlabel('Openings')
-    plt.title('White'+rating_range)
+    plt.title("Best Opening for "+color+" in Rating Range "+rating_range)
 
     Pos = range(len(openings_str_list), 0, -1)
-    print(Pos)
+    #print(Pos)
     plt.barh(Pos, win_w, color='white', edgecolor = '0')
     plt.barh(Pos, draw_, left  = win_w, color='grey', edgecolor = '0')
     plt.barh(Pos, win_b, left  = win_w + draw_, color='black', edgecolor = '0')
     plt.yticks(Pos, openings_str_list)
+    plt.tight_layout()
 
-    plt.show()
+    # save the plot
+    fig_name = rating_range+color
+    plt.savefig(fig_name)
 
 
 # gets the opening name
@@ -133,6 +136,14 @@ def get_opening_str(index:int):
     for k, v in openings.items():
         if int(k) == index:
             return v
+    # if something went wrong
+    return -1
+
+def get_opening_num(name:str):
+    openings = get_openings("D:databases")
+    for k, v in openings.items():
+        if v == name:
+            return int(k)
     # if something went wrong
     return -1
     
@@ -147,17 +158,33 @@ def get_best_n_openings(openings:list, n:int):
 
     best_openings_w = []
     best_openings_b = []
-    for i in range(n):
+
+    # best openings for white
+    for i in range(n+1):
         best = get_best_opening_w(openings)
         best_openings_w.append(best)
         openings.remove(best)
-
+    # remove kp bug.
+    best_openings_w = remove_kp(best_openings_w)
+    
+    # best openings for black
     for i in range(n):
         best = get_best_opening_b(openings)
         best_openings_b.append(best)
         openings.remove(best)
 
     return best_openings_w, best_openings_b
+
+# quick fix for kings pawn bug. Need to track this down.
+def remove_kp(best_openings):
+    popi = 0
+    for i in range(len(best_openings)):
+        if best_openings[i].index == get_opening_num("King's Pawn"):
+            popi = i
+    best_openings.pop(popi)
+    return best_openings
+
+
 
 
 def get_best_opening_w(openings:list):
@@ -176,14 +203,11 @@ def get_best_opening_b(openings:list):
 
 def iterate_csvs(csvs:list):
     for csv in csvs:
-        #print(csv)
         data = pd.read_csv(csv, header = None)
-        #print(data.head)
         data = data.to_numpy(dtype=np.int)
         print("analyzing",csv)
         analyze(csv, data)
-        #print(data.shape)
-        break
+        #break
 
 
 if __name__ == "__main__":
