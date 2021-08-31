@@ -6,6 +6,6 @@ Compatable with lichess databases
 
 ## Example output from 100 million games:
 
-![](chess/Figures/0-999Black.png)
+![](chess/blob/main/Figures/0-999Black.png)
 
 
